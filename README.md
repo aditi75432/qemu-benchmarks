@@ -45,8 +45,8 @@ All components are containerized using Docker for maximum reproducibility across
 
 ### 1. Clone Repository
 ```bash
-git clone https://github.com/yourusername/qemu-simpoint-benchmarks.git
-cd qemu-simpoint-benchmarks
+git clone https://github.com/yourusername/qemu-benchmarks.git
+cd qemu-benchmarks
 ```
 
 ### 2. Run Dhrystone Analysis
