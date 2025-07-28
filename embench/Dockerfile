@@ -1,115 +1,51 @@
 FROM ubuntu:22.04
 
-# Avoid interactive prompts during installation
 ENV DEBIAN_FRONTEND=noninteractive
 ENV TZ=Etc/UTC
 
-# Update package lists
-RUN apt update && apt upgrade -y
+# Dockerfile
+RUN apt update && apt upgrade -y && apt install -y \
+    git build-essential curl gcc g++ python3 python3-pip python3-dev \
+    autoconf automake autotools-dev libtool texinfo patchutils \
+    libmpc-dev libmpfr-dev libgmp-dev zlib1g-dev libexpat-dev bc \
+    ninja-build flex bison cmake libglib2.0-dev libpixman-1-dev \
+    libslirp-dev pkg-config libcapstone-dev python3-venv \
+    libncurses5-dev libgtk-3-dev python3-sphinx \
+    python3-sphinx-rtd-theme \
+    gcc-riscv64-unknown-elf
 
-# Install all dependencies for QEMU compilation and Embench
-RUN apt install -y \
-  git-email \
-  libaio-dev \
-  libbluetooth-dev \
-  libcapstone-dev \
-  libbrlapi-dev \
-  libbz2-dev \
-  libcap-ng-dev \
-  libcurl4-gnutls-dev \
-  libgtk-3-dev \
-  libibverbs-dev \
-  libjpeg8-dev \
-  libncurses5-dev \
-  libnuma-dev \
-  librbd-dev \
-  librdmacm-dev \
-  libsasl2-dev \
-  libsdl2-dev \
-  libseccomp-dev \
-  libsnappy-dev \
-  libssh-dev \
-  libvde-dev \
-  libvdeplug-dev \
-  libvte-2.91-dev \
-  libxen-dev \
-  liblzo2-dev \
-  valgrind \
-  xfslibs-dev \
-  libnfs-dev \
-  libiscsi-dev \
-  gcc \
-  binutils \
-  python3-pip \
-  python3-sphinx \
-  python3-sphinx-rtd-theme \
-  ninja-build \
-  flex \
-  bison \
-  git \
-  python3-tomli \
-  autoconf \
-  automake \
-  autotools-dev \
-  curl \
-  python3 \
-  libmpc-dev \
-  libmpfr-dev \
-  libgmp-dev \
-  gawk \
-  build-essential \
-  texinfo \
-  gperf \
-  libtool \
-  patchutils \
-  bc \
-  zlib1g-dev \
-  libexpat-dev \
-  cmake \
-  libglib2.0-dev \
-  gcc-riscv64-linux-gnu \
-  libslirp-dev \
-  pkg-config \
-  libpixman-1-dev \
-  python3-dev \
-  python3-venv
+# Ensure tomli is available globally for QEMU configure step
+RUN pip3 install --no-cache-dir tomli
 
-# Clone repositories
-RUN git clone https://gitlab.com/qemu-project/qemu.git
-RUN git clone https://github.com/embench/embench-iot.git
-RUN git clone https://github.com/hanhwi/SimPoint.git
-
-# Build QEMU with RISC-V support and BBV plugin
+#  Build riscv32-softmmu for system emulation of bare-metal code ===
+RUN git clone https://gitlab.com/qemu-project/qemu.git /qemu
 WORKDIR /qemu/build
-RUN ../configure --target-list=riscv32-linux-user,riscv64-linux-user,riscv32-softmmu,riscv64-softmmu --enable-plugins
-RUN make -j$(nproc)
-RUN make install
-
-# Set environment variable for QEMU plugins
+RUN ../configure --target-list=riscv32-softmmu --enable-plugins && \
+    make -j$(nproc) && \
+    make install
 ENV QEMU_PLUGINS=/qemu/build/contrib/plugins
 
-# Build SimPoint
-WORKDIR /SimPoint/
+# Install SimPoint
+WORKDIR /
+RUN git clone https://github.com/hanhwi/SimPoint.git
+WORKDIR /SimPoint
 RUN make -j$(nproc)
-ENV PATH="$PATH:/SimPoint/bin"
+ENV PATH="/SimPoint/bin:$PATH"
 
-# Setup Embench
+
+
+# Clone and build Embench
+WORKDIR /
+RUN git clone --recursive https://github.com/embench/embench-iot.git
 WORKDIR /embench-iot
-RUN python3 -m venv venv
-RUN /bin/bash -c "source venv/bin/activate && \
-    if [ -f requirements.txt ]; then \
-        pip install -r requirements.txt; \
-    else \
-        echo 'No requirements.txt found - embench-iot uses standard Python libraries'; \
-    fi"
+# The Makefile will automatically find 'riscv32-unknown-elf-gcc' in the PATH
+RUN make PORT=baremetal TARGET=rv32
 
-# Build Embench for RISC-V
-RUN /bin/bash -c "source venv/bin/activate && python3 build_all.py --arch riscv32 --chip generic --board ri5cyverilator --cc riscv64-linux-gnu-gcc --cflags='-march=rv32i -mabi=ilp32 -static' --ldflags='-static'"
+# Collect all .elf files
+RUN find work -name "*.elf" > /embench_binaries.txt
 
-# Create output directory
+# Output directory for use outside the container
 RUN mkdir -p /output
 
-# Create wrapper scripts for embench binaries
-RUN find bd -name "*.elf" -type f > /embench_binaries.txt
-
+# Final working directory
 WORKDIR /

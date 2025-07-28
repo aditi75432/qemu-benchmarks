@@ -1,7 +1,6 @@
 #!/bin/bash
 set -e
 
-# Configuration
 BUILD_SCRIPT="./build_docker.sh"
 RUN_SCRIPT="./run_in_docker.sh"
 
@@ -18,6 +17,6 @@ bash "$RUN_SCRIPT"
 
 echo ""
 echo "=========================================="
-echo "Complete Embench workflow finished successfully!"
-echo "Check the simpoint_output directory for results"
+echo "Workflow completed!"
+echo "Check the simpoint_output/ directory for results."
 echo "=========================================="
