@@ -1,4 +1,3 @@
-````markdown
 # Embench Execution Tracing with QEMU
 
 ## Introduction
